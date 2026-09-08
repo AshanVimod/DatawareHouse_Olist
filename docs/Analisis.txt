@@ -1,0 +1,58 @@
+
+--- orders ---
+Shape: (99441, 8)
+Nulls:
+order_approved_at                 160
+order_delivered_carrier_date     1783
+order_delivered_customer_date    2965
+dtype: int64
+
+--- order_items ---
+Shape: (112650, 7)
+Nulls:
+Series([], dtype: int64)
+
+--- payments ---
+Shape: (103886, 5)
+Nulls:
+Series([], dtype: int64)
+
+--- customers ---
+Shape: (99441, 5)
+Nulls:
+Series([], dtype: int64)
+
+--- products ---
+Shape: (32951, 9)
+Nulls:
+product_category_name         610
+product_name_lenght           610
+product_description_lenght    610
+product_photos_qty            610
+product_weight_g                2
+product_length_cm               2
+product_height_cm               2
+product_width_cm                2
+dtype: int64
+
+--- sellers ---
+Shape: (3095, 4)
+Nulls:
+Series([], dtype: int64)
+
+--- reviews ---
+Shape: (99224, 7)
+Nulls:
+review_comment_title      87656
+review_comment_message    58247
+dtype: int64
+
+--- geolocation ---
+Shape: (1000163, 5)
+Nulls:
+Series([], dtype: int64)
+
+--- category_translation ---
+Shape: (71, 2)
+Nulls:
+Series([], dtype: int64)

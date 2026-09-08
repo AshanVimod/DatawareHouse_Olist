@@ -1,0 +1,134 @@
+-- -- =========================================================
+-- -- PART B — SQL AND OLAP
+-- -- Olist Data Warehouse
+-- -- =========================================================
+
+-- -- =========================================================
+-- -- B1 — ROLLUP with GROUPING()
+-- -- Total payment_value by product category and seller state,
+-- -- with subtotals per category and a grand total.
+-- --
+-- -- Business interpretation: Shows revenue broken down by category
+-- -- and state, with a subtotal per category and one grand total row.
+-- -- Lets you compare which categories perform well overall versus
+-- -- which ones depend heavily on a single state.
+-- -- =========================================================
+-- SELECT
+--     CASE WHEN GROUPING(p.category_english) = 1 THEN 'All Categories'
+--          ELSE p.category_english END AS category,
+--     CASE WHEN GROUPING(s.seller_state) = 1 THEN 'All States'
+--          ELSE s.seller_state END AS seller_state,
+--     SUM(f.payment_value) AS total_payment
+-- FROM FACT_ORDERS f
+-- JOIN DIM_PRODUCT p ON f.product_key = p.product_key
+-- JOIN DIM_SELLER s ON f.seller_key = s.seller_key
+-- GROUP BY ROLLUP(p.category_english, s.seller_state)
+-- ORDER BY p.category_english, s.seller_state;
+
+
+-- -- =========================================================
+-- -- B2 — Year-over-Year Comparison using LAG()
+-- -- Total revenue per product category per quarter (2017 vs 2018),
+-- -- plus year-over-year percentage change.
+-- --
+-- -- Business interpretation: Shows whether each category is growing
+-- -- or shrinking quarter-by-quarter across years. NULLIF guards
+-- -- against division-by-zero for categories with no prior-year sales.
+-- -- Categories with strong YoY growth signal where to focus marketing.
+-- -- =========================================================
+-- WITH quarterly_revenue AS (
+--     SELECT
+--         p.category_english AS category,
+--         t.year,
+--         t.quarter,
+--         SUM(f.payment_value) AS revenue
+--     FROM FACT_ORDERS f
+--     JOIN DIM_PRODUCT p ON f.product_key = p.product_key
+--     JOIN DIM_TIME t ON f.time_key = t.time_key
+--     WHERE t.year IN (2017, 2018)
+--     GROUP BY p.category_english, t.year, t.quarter
+-- )
+-- SELECT
+--     category,
+--     year,
+--     quarter,
+--     revenue,
+--     LAG(revenue) OVER (PARTITION BY category, quarter ORDER BY year) AS prior_year_revenue,
+--     ROUND(
+--         (revenue - LAG(revenue) OVER (PARTITION BY category, quarter ORDER BY year)) * 100.0
+--         / NULLIF(LAG(revenue) OVER (PARTITION BY category, quarter ORDER BY year), 0), 2
+--     ) AS yoy_pct_change
+-- FROM quarterly_revenue
+-- ORDER BY category, quarter, year;
+
+
+-- =========================================================
+-- B3 — Ranking within a Dimension
+-- Top 5 sellers by total revenue within each product category
+-- for 2018.
+--
+-- Business interpretation: Identifies each category's top-performing
+-- sellers, useful for partnership programs or featured-seller
+-- placement.
+--
+-- Why the rank filter must be in an outer query, not the same-level
+-- WHERE: window functions like RANK() are evaluated AFTER the WHERE
+-- clause runs (SQL processes FROM/JOIN -> WHERE -> GROUP BY -> window
+-- functions -> SELECT). Since seller_rank does not exist yet at the
+-- point WHERE is evaluated, you cannot filter on it there. The CTE
+-- finishes computing all rank values first, and only then does the
+-- outer SELECT filter down to the top 5 - this two-pass structure is
+-- required, not optional.
+-- =========================================================
+-- WITH seller_revenue AS (
+--     SELECT
+--         p.category_english AS category,
+--         s.seller_id,
+--         s.seller_state,
+--         SUM(f.payment_value) AS total_revenue
+--     FROM FACT_ORDERS f
+--     JOIN DIM_PRODUCT p ON f.product_key = p.product_key
+--     JOIN DIM_SELLER s ON f.seller_key = s.seller_key
+--     JOIN DIM_TIME t ON f.time_key = t.time_key
+--     WHERE t.year = 2018
+--     GROUP BY p.category_english, s.seller_id, s.seller_state
+-- ),
+-- ranked AS (
+--     SELECT
+--         category,
+--         seller_id,
+--         seller_state,
+--         total_revenue,
+--         RANK() OVER (PARTITION BY category ORDER BY total_revenue DESC) AS seller_rank
+--     FROM seller_revenue
+-- )
+-- SELECT category, seller_id, seller_state, total_revenue, seller_rank
+-- FROM ranked
+-- WHERE seller_rank <= 5
+-- ORDER BY category, seller_rank;
+
+
+-- =========================================================
+-- B4 — OLAP Operation Identification
+-- (Queries as given in the assignment - answers below)
+--
+-- Query 1: SLICE
+--   Filters to a single value on one dimension (year=2018 AND
+--   quarter='Q1') while still grouping by category - cutting one
+--   flat "slice" out of the cube.
+--
+-- Query 2: DRILL-DOWN
+--   Goes from a coarser level (customer_state) to a finer one
+--   (customer_city) within the same dimension hierarchy - more
+--   detail, not less.
+--
+-- Query 3: DICE
+--   Filters on multiple dimensions simultaneously with multi-value
+--   IN lists (3 states AND 2 categories) - carving a smaller
+--   sub-cube, not just one flat slice.
+--
+-- Query 4: PIVOT
+--   Uses CASE WHEN to rotate state values into separate columns
+--   (SP, RJ, MG) - reshaping rows into columns is the defining
+--   feature of a pivot.
+-- =========================================================
